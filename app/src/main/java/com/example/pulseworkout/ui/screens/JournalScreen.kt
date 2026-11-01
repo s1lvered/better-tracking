@@ -48,6 +48,9 @@ import com.example.pulseworkout.ui.components.GlowDot
 import com.example.pulseworkout.ui.components.KpiTile
 import com.example.pulseworkout.ui.components.MetaRow
 import com.example.pulseworkout.ui.components.RoundIconButton
+import com.example.pulseworkout.ui.components.SupersetBadge
+import com.example.pulseworkout.ui.components.SupersetLetter
+import androidx.compose.foundation.layout.fillMaxHeight
 import com.example.pulseworkout.ui.theme.Bt
 import com.example.pulseworkout.ui.theme.BtType
 import com.example.pulseworkout.ui.theme.Ds
@@ -158,7 +161,7 @@ private fun ActiveTrainingCard(vm: AppViewModel) {
                 ),
             )
         }
-        Text(Calc.clock(vm.sessionElapsedSeconds()), style = DsType.Title2B.copy(fontFeatureSettings = "tnum"), color = Ds.lime)
+        Text(Calc.hms(vm.sessionElapsedSeconds()), style = DsType.Title2B.copy(fontFeatureSettings = "tnum"), color = Ds.lime)
     }
 }
 
@@ -265,14 +268,44 @@ private fun androidx.compose.foundation.layout.RowScope.TrendTile(
 @Composable
 private fun WorkoutDetails(vm: AppViewModel, workout: Workout) {
     val records = vm.calc.recordEntries(workout)
-    workout.entries.filter { !it.isCardio }.groupBy { it.exerciseId }.forEach { (exerciseId, entries) ->
+    @Composable
+    fun exerciseBlock(exerciseId: String?, entries: List<Entry>, letter: String?) {
         val exercise = vm.calc.exercise(exerciseId)
         val summary = vm.calc.summary(entries)
-        Column(Modifier.padding(top = 18.dp)) {
-            Text(exercise.name, style = DsType.Title1B)
-            MetaRow(listOf(null to "${summary.sets} ${Calc.plural(summary.sets, "подход", "подхода", "подходов")}", null to Calc.tonnage(summary.tonnage)))
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (letter != null) { SupersetLetter(letter); Spacer(Modifier.width(8.dp)) }
+                Column {
+                    Text(exercise.name, style = DsType.Title1B)
+                    MetaRow(listOf(null to "${summary.sets} ${Calc.plural(summary.sets, "подход", "подхода", "подходов")}", null to Calc.tonnage(summary.tonnage)))
+                }
+            }
             Spacer(Modifier.height(8.dp))
             RepTable(entries.sortedBy { it.set }, { vm.calc.formatEntryWeight(it) }, { it in records })
+        }
+    }
+    // Блоки в порядке выполнения: суперсет — одна группа (метка, лаймовая линия, буквы A/B), остальные — по упражнению.
+    val strength = workout.entries.filter { !it.isCardio }
+    val blocks = strength.map { it.supersetId?.let { s -> "superset:$s" } ?: "exercise:${it.exerciseId}" }.distinct()
+    blocks.forEach { key ->
+        if (key.startsWith("superset:")) {
+            val group = strength.filter { it.supersetId == key.removePrefix("superset:") }
+            val byExercise = group.groupBy { it.exerciseId }
+            val rounds = byExercise.values.maxOf { it.size }
+            Row(Modifier.padding(top = 18.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                Box(Modifier.width(2.dp).fillMaxHeight().background(Ds.limeSecondary))
+                Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SupersetBadge()
+                        Spacer(Modifier.width(8.dp))
+                        Text("$rounds ${Calc.plural(rounds, "круг", "круга", "кругов")} · ${Calc.tonnage(vm.calc.summary(group).tonnage)}", style = DsType.Label2R, color = Ds.whiteTertiary)
+                    }
+                    byExercise.entries.forEachIndexed { index, (exerciseId, entries) -> exerciseBlock(exerciseId, entries, ('A' + index).toString()) }
+                }
+            }
+        } else {
+            val exerciseId = key.removePrefix("exercise:").takeIf { it != "null" }
+            Box(Modifier.padding(top = 18.dp)) { exerciseBlock(exerciseId, strength.filter { it.supersetId == null && it.exerciseId == exerciseId }, null) }
         }
     }
     workout.entries.filter { it.isCardio }.forEach { entry ->

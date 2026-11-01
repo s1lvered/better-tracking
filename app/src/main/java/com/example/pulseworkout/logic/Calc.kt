@@ -339,6 +339,12 @@ class Calc(private val state: () -> AppState) {
             }
         }
 
+        /** Длительность тренировки в формате 00:24:18, как в макете TimerHero. */
+        fun hms(seconds: Long): String {
+            val total = max(0L, seconds)
+            return "%02d:%02d:%02d".format(total / 3600, total / 60 % 60, total % 60)
+        }
+
         fun clock(seconds: Long): String {
             val total = max(0L, seconds)
             return "%02d:%02d".format(total / 60, total % 60)

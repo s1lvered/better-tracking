@@ -101,6 +101,8 @@ data class Entry(
     var weighted: Boolean = true,
     var bodyweightMode: Boolean = false,
     var bodyWeight: Double = 0.0,
+    // Нет в оригинале: подходы упражнений одного суперсета имеют общий supersetId.
+    var supersetId: String? = null,
     // cardio
     var cardioEntryId: String? = null,
     var cardioId: String? = null,
@@ -123,8 +125,14 @@ data class Entry(
     val isRunningCardio get() = isCardio && completed == false && startedAt != null
 }
 
+/** Упражнение в тренировке; supersetId объединяет упражнения, которые выполняются по кругу (A → B → C). */
 @Serializable
-data class ExerciseInstance(val instanceId: String, val exerciseId: String, var completed: Boolean = false)
+data class ExerciseInstance(
+    val instanceId: String,
+    val exerciseId: String,
+    var completed: Boolean = false,
+    var supersetId: String? = null,
+)
 
 @Serializable
 data class ActiveSession(

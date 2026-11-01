@@ -151,7 +151,7 @@ fun BetterTrackingApp(vm: AppViewModel) {
     when (val sheet = vm.sheet) {
         null -> Unit
         Sheet.StartWorkout -> StartWorkoutSheet(vm)
-        Sheet.ExerciseChooser -> ExerciseChooserSheet(vm)
+        is Sheet.ExerciseChooser -> ExerciseChooserSheet(vm, sheet)
         is Sheet.SetEntry -> SetEntrySheet(vm, sheet)
         is Sheet.CardioFinish -> CardioFinishSheet(vm, sheet)
         is Sheet.CardioManual -> CardioManualSheet(vm, sheet)
@@ -267,7 +267,8 @@ private fun WorkoutButton(vm: AppViewModel) {
 /** Tabbar Button: активная — радиальное лаймовое свечение, иконка и подпись Lime/Accent. */
 @Composable
 private fun NavItem(vm: AppViewModel, id: String, label: String, icon: ImageVector, modifier: Modifier) {
-    val active = vm.tab == id || (id == "journal" && vm.tab == "log" && vm.session == null)
+    // Как в макетах: экран тренировки открыт из журнала, поэтому «Журнал» остаётся активным.
+    val active = vm.tab == id || (id == "journal" && vm.tab == "log")
     Column(
         modifier
             .fillMaxHeight()

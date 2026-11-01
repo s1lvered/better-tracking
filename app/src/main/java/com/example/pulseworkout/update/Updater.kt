@@ -54,7 +54,8 @@ sealed interface UpdateState {
 class Updater(private val context: Context, private val repo: String, private val currentVersion: String) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    val enabled: Boolean get() = repo.matches(Regex("[\\w.-]+/[\\w.-]+"))
+    // В JVM-тестах (Robolectric) в сеть не ходим: тесты не зависят от релизов на GitHub.
+    val enabled: Boolean get() = repo.matches(Regex("[\\w.-]+/[\\w.-]+")) && Build.FINGERPRINT != "robolectric"
 
     /** Возвращает релиз, если он новее установленной версии; null — обновления нет или сеть недоступна. */
     suspend fun check(): GithubRelease? = withContext(Dispatchers.IO) {

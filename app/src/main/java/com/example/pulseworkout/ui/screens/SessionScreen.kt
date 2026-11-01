@@ -64,6 +64,8 @@ import com.example.pulseworkout.ui.components.Ring
 import com.example.pulseworkout.ui.components.RoundIconButton
 import com.example.pulseworkout.ui.components.SectionTitle
 import com.example.pulseworkout.ui.components.SheetTitle
+import com.example.pulseworkout.ui.components.SupersetBadge
+import com.example.pulseworkout.ui.components.SupersetLetter
 import com.example.pulseworkout.ui.components.WheelPicker
 import com.example.pulseworkout.ui.theme.Bt
 import com.example.pulseworkout.ui.theme.BtType
@@ -104,22 +106,37 @@ fun ActiveSessionScreen(vm: AppViewModel) {
 
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Btn("Добавить упражнение", vm.feedback, Modifier.weight(1f), icon = DsIcons.Plus) { vm.sheet = Sheet.ExerciseChooser }
+            Btn("Добавить упражнение", vm.feedback, Modifier.weight(1f), icon = DsIcons.Plus) { vm.sheet = Sheet.ExerciseChooser() }
             if (!editing) {
-                RoundIconButton(
-                    DsIcons.Radiowaves, if (connected) "Отключить браслет" else "Подключить браслет", vm.feedback,
-                    tint = if (connected) Ds.black else Ds.white, background = if (connected) Ds.lime else Ds.whiteOpacity, size = 52.dp,
-                ) { vm.toggleWearable() }
+                // IconButton из макета: Filled (лаймовый градиент), когда браслет подключён, иначе Ghost
+                Box(
+                    Modifier.size(52.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (connected) Ds.primaryBrush else androidx.compose.ui.graphics.SolidColor(Ds.whiteOpacity))
+                        .clickable { vm.feedback.haptic(); vm.toggleWearable() },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(DsIcons.Radiowaves, if (connected) "Отключить браслет" else "Подключить браслет", tint = if (connected) Ds.black else Ds.white, modifier = Modifier.size(22.dp)) }
             }
         }
 
         val cardio = s.entries.filter { it.isCardio }
-        val groups = s.exerciseInstances.map { instance -> instance to vm.instanceEntries(instance) }
-            .filter { (instance, entries) -> entries.isNotEmpty() || !instance.completed }
-        if (cardio.isNotEmpty() || groups.isNotEmpty()) SectionTitle("Упражнения", trailing = "${cardio.size + groups.size}")
+        // Карточки: обычные упражнения по одной, суперсет — одной карточкой на всю группу.
+        val visible = s.exerciseInstances.filter { vm.instanceEntries(it).isNotEmpty() || !it.completed }
+        val cards = mutableListOf<Pair<String?, ExerciseInstance?>>()
+        val seenSupersets = mutableSetOf<String>()
+        visible.forEach { instance ->
+            val group = instance.supersetId
+            when {
+                group == null -> cards += null to instance
+                seenSupersets.add(group) -> cards += group to null
+            }
+        }
+        if (cardio.isNotEmpty() || cards.isNotEmpty()) SectionTitle("Упражнения", trailing = "${cardio.size + cards.size}")
         else EmptyState("Добавьте первое упражнение", "Выберите движение из сплита\nили запустите кардио", icon = DsIcons.Exercise)
         cardio.forEach { CardioCard(vm, it, connected, wearable.bpm); Spacer(Modifier.height(10.dp)) }
-        groups.forEach { (instance, entries) -> ExerciseCard(vm, instance, entries); Spacer(Modifier.height(10.dp)) }
+        cards.forEach { (group, instance) ->
+            if (group != null) SupersetCard(vm, group) else ExerciseCard(vm, instance!!, vm.instanceEntries(instance))
+            Spacer(Modifier.height(10.dp))
+        }
 
         Spacer(Modifier.height(8.dp))
         Btn(
@@ -146,7 +163,7 @@ private fun TimerHero(vm: AppViewModel, connected: Boolean, bpm: Int?) {
                 Spacer(Modifier.width(4.dp))
                 Text("Время тренировки", style = DsType.Label2R, color = Ds.whiteTertiary)
             }
-            Text(Calc.clock(vm.sessionElapsedSeconds()), style = BtType.timer)
+            Text(Calc.hms(vm.sessionElapsedSeconds()), style = BtType.timer)
             if (connected) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(DsIcons.Heart, null, tint = Ds.negative, modifier = Modifier.size(14.dp))
@@ -235,6 +252,15 @@ private fun ExerciseCard(vm: AppViewModel, instance: ExerciseInstance, entries: 
                 )
             }
             if (instance.completed) Text("Изменить", style = DsType.Label3B, color = Ds.lime, modifier = Modifier.clip(PillShape).clickable { vm.feedback.haptic(); vm.reopenExercise(instance.instanceId) }.padding(6.dp))
+            else Row(
+                // «Суперсет» в шапке активного упражнения — выбор второго упражнения
+                Modifier.clip(PillShape).clickable { vm.feedback.haptic(); vm.startSuperset(instance.instanceId) }.padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(DsIcons.Superset, null, tint = Ds.lime, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Суперсет", style = DsType.Label3B, color = Ds.lime)
+            }
         }
         if (instance.completed) return@Panel
         Spacer(Modifier.height(10.dp))
@@ -246,6 +272,78 @@ private fun ExerciseCard(vm: AppViewModel, instance: ExerciseInstance, entries: 
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Btn("Подход", vm.feedback, Modifier.weight(1f), BtnKind.Secondary, icon = DsIcons.Plus, height = 44.dp) { vm.openSetEntry(instance.exerciseId, instance.instanceId) }
             Btn("Завершить", vm.feedback, Modifier.weight(1f), BtnKind.Text, icon = DsIcons.Check, height = 44.dp) { vm.finishExercise(instance.instanceId) }
+        }
+    }
+}
+
+/** SupersetCard: упражнения A/B/C по кругу; у каждого свои подходы, общие «В суперсет» и «Завершить». */
+@Composable
+private fun SupersetCard(vm: AppViewModel, supersetId: String) {
+    val members = vm.supersetMembers(supersetId)
+    if (members.isEmpty()) return
+    val completed = members.all { it.completed }
+    val entries = members.flatMap { vm.instanceEntries(it) }
+    val summary = vm.calc.summary(entries)
+    val rounds = members.maxOf { vm.instanceEntries(it).size }
+    val (round, next) = vm.supersetProgress(supersetId)
+    Panel(Modifier.animateContentSize(), borderColor = if (completed) androidx.compose.ui.graphics.Color.Transparent else Ds.limeSecondary) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SupersetBadge()
+            Spacer(Modifier.width(8.dp))
+            if (!completed && next != null) Text("Круг $round · дальше ${vm.supersetLetter(next)}", style = DsType.Label2R, color = Ds.lime)
+            Spacer(Modifier.weight(1f))
+            if (completed) Text("Изменить", style = DsType.Label3B, color = Ds.lime, modifier = Modifier.clip(PillShape).clickable { vm.feedback.haptic(); vm.reopenSuperset(supersetId) }.padding(6.dp))
+        }
+        if (completed) {
+            Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                members.forEach { m ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SupersetLetter(vm.supersetLetter(m))
+                        Spacer(Modifier.width(8.dp))
+                        Text(vm.calc.exercise(m.exerciseId).name, style = DsType.Title1B, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            MetaRow(
+                listOf(DsIcons.Check to "Завершено", null to "$rounds ${Calc.plural(rounds, "круг", "круга", "кругов")}", null to "${summary.sets} ${Calc.plural(summary.sets, "подход", "подхода", "подходов")}", null to Calc.tonnage(summary.tonnage)),
+                Modifier.padding(top = 8.dp),
+            )
+            return@Panel
+        }
+        members.forEachIndexed { index, m ->
+            if (index > 0) androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 12.dp), thickness = 1.dp, color = Ds.whiteOpacity)
+            else Spacer(Modifier.height(12.dp))
+            val exercise = vm.calc.exercise(m.exerciseId)
+            val sets = vm.instanceEntries(m)
+            val s = vm.calc.summary(sets)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SupersetLetter(vm.supersetLetter(m))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(exercise.name, style = DsType.Title1B, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (sets.isEmpty()) vm.calc.categoryOf(exercise) else "${s.sets} ${Calc.plural(s.sets, "подход", "подхода", "подходов")} · ${Calc.tonnage(s.tonnage)}",
+                        style = DsType.Label2R, color = Ds.whiteTertiary,
+                    )
+                }
+                RoundIconButton(DsIcons.Close, "Убрать из суперсета", vm.feedback, tint = Ds.whiteQuaternary, background = androidx.compose.ui.graphics.Color.Transparent, size = 28.dp) { vm.leaveSuperset(m.instanceId) }
+            }
+            if (sets.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                RepTable(sets, { vm.calc.formatEntryWeight(it) }, { false }, onDelete = { vm.feedback.haptic(); vm.deleteSet(it) })
+            }
+            Row(
+                Modifier.padding(top = 6.dp).clip(PillShape).clickable { vm.feedback.haptic(); vm.openSetEntry(m.exerciseId, m.instanceId) }.padding(vertical = 4.dp, horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(DsIcons.Plus, null, tint = Ds.lime, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Подход", style = DsType.Label3B, color = Ds.lime)
+            }
+        }
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Btn("В суперсет", vm.feedback, Modifier.weight(1f), BtnKind.Secondary, icon = DsIcons.Plus, height = 44.dp) { vm.startSuperset(members.last().instanceId) }
+            Btn("Завершить", vm.feedback, Modifier.weight(1f), BtnKind.Text, icon = DsIcons.Check, height = 44.dp) { vm.finishSuperset(supersetId) }
         }
     }
 }
@@ -280,17 +378,24 @@ fun StartWorkoutSheet(vm: AppViewModel) {
 }
 
 @Composable
-fun ExerciseChooserSheet(vm: AppViewModel) {
+fun ExerciseChooserSheet(vm: AppViewModel, sheet: Sheet.ExerciseChooser) {
     val s = vm.session ?: return
+    // Режим суперсета: второе упражнение для группы; кардио и упражнения группы не предлагаются.
+    val target = sheet.supersetWith?.let { id -> s.exerciseInstances.firstOrNull { it.instanceId == id } }
+    val inGroup = target?.supersetId?.let { g -> vm.supersetMembers(g).map { it.exerciseId }.toSet() } ?: setOfNotNull(target?.exerciseId)
     val active = vm.calc.activeExercises()
     val splitExercises = active.filter { !it.universal && s.splitId in it.splitIds }
     val splitIds = splitExercises.map { it.id }.toSet()
-    val strength = splitExercises + active.filter { it.universal && it.id !in splitIds }
+    val strength = (splitExercises + active.filter { it.universal && it.id !in splitIds }).filter { it.id !in inGroup }
     val categories = vm.calc.sortCategories(strength.map { vm.calc.categoryOf(it) })
-    val tabs = listOf("all" to "Все") + categories.map { "category:$it" to it } + ("cardio" to "Кардио")
+    val tabs = listOf("all" to "Все") + categories.map { "category:$it" to it } + if (target == null) listOf("cardio" to "Кардио") else emptyList()
     var tab by remember { mutableStateOf("all") }
     BtSheet(onDismiss = { vm.closeSheet() }) {
-        SheetTitle("Добавить упражнение")
+        if (target != null) {
+            SupersetBadge()
+            Spacer(Modifier.height(6.dp))
+            SheetTitle("Добавить в суперсет", "Будет чередоваться с «${vm.calc.exercise(target.exerciseId).name}»")
+        } else SheetTitle("Добавить упражнение")
         ChipTabs(tabs, tab, vm.feedback) { tab = it }
         Spacer(Modifier.height(12.dp))
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
@@ -305,7 +410,7 @@ fun ExerciseChooserSheet(vm: AppViewModel) {
                     val category = vm.calc.categoryOf(exercise)
                     val inSession = s.exerciseInstances.any { it.exerciseId == exercise.id }
                     ChoiceRow(exercise.name, if (inSession) "$category · уже в тренировке" else category, Bt.color(Catalog.categoryColor(category))) {
-                        vm.selectSessionExercise(exercise.id)
+                        vm.selectSessionExercise(exercise.id, sheet.supersetWith)
                     }
                 }
             }
@@ -331,11 +436,20 @@ fun SetEntrySheet(vm: AppViewModel, sheet: Sheet.SetEntry) {
     }
     val showWeight = weighted || !supportsBodyweight
 
+    val instance = vm.session?.exerciseInstances?.firstOrNull { it.instanceId == sheet.instanceId }
+    val supersetId = instance?.supersetId
     BtSheet(onDismiss = { vm.closeSheet() }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            GlowDot()
-            Spacer(Modifier.width(6.dp))
-            Text("Подход ${defaults.setIndex + 1}", style = DsType.Body2R, color = Ds.whiteSecondary)
+            if (supersetId != null) {
+                // «Суперсет · B · подход 2 · круг 2» из макета «Workout / 14»
+                SupersetBadge()
+                Spacer(Modifier.width(6.dp))
+                Text("${vm.supersetLetter(instance)} · подход ${defaults.setIndex + 1} · круг ${defaults.setIndex + 1}", style = DsType.Body2R, color = Ds.whiteSecondary)
+            } else {
+                GlowDot()
+                Spacer(Modifier.width(6.dp))
+                Text("Подход ${defaults.setIndex + 1}", style = DsType.Body2R, color = Ds.whiteSecondary)
+            }
         }
         Text(exercise.name, style = DsType.Headline1B)
         if (canToggle) {
@@ -357,6 +471,15 @@ fun SetEntrySheet(vm: AppViewModel, sheet: Sheet.SetEntry) {
                 Text("Повторения", style = DsType.Label2R, color = Ds.whiteTertiary)
                 WheelPicker(reps, defaults.reps - 1, { "$it" }, vm.feedback) { repCount = it }
             }
+        }
+        if (supersetId != null && vm.session?.editingWorkoutId == null) {
+            val members = vm.supersetMembers(supersetId)
+            val next = members.getOrNull(members.indexOf(instance) + 1)
+            Text(
+                if (next != null) "После подхода — ${vm.supersetLetter(next)}: ${vm.calc.exercise(next.exerciseId).name}"
+                else "После подхода: отдых — это последнее упражнение круга",
+                style = DsType.Label2R, color = Ds.lime, modifier = Modifier.padding(top = 8.dp),
+            )
         }
         FormActions(vm.feedback, "Добавить подход", onCancel = { vm.closeSheet() }) {
             vm.addSet(sheet.exerciseId, sheet.instanceId, weight, repCount, weighted)

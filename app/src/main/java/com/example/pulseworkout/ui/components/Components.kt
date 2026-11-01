@@ -357,6 +357,28 @@ fun Checkbox(checked: Boolean, modifier: Modifier = Modifier) {
     ) { if (checked) Icon(DsIcons.Check, null, tint = Ds.black, modifier = Modifier.size(14.dp)) }
 }
 
+/** SupersetBadge: лаймовая метка «Суперсет» со значком связки. */
+@Composable
+fun SupersetBadge() {
+    Row(
+        Modifier.clip(PillShape).background(Ds.lime).padding(start = 8.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(DsIcons.Superset, null, tint = Ds.black, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(4.dp))
+        Text("Суперсет", style = DsType.Label2B, color = Ds.black)
+    }
+}
+
+/** SupersetLetter: буква упражнения в суперсете (A, B, C). */
+@Composable
+fun SupersetLetter(letter: String) {
+    Box(
+        Modifier.size(24.dp).clip(RoundedCornerShape(8.dp)).background(Ds.whiteOpacity).border(1.dp, Ds.limeSecondary, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+    ) { Text(letter, style = DsType.Label2B, color = Ds.lime) }
+}
+
 /** ListItem: точка цвета, название и подпись; справа шеврон или чекбокс. */
 @Composable
 fun ChoiceRow(title: String, subtitle: String?, dot: Color?, selected: Boolean = false, showChevron: Boolean = true, checkable: Boolean = false, onClick: () -> Unit) {

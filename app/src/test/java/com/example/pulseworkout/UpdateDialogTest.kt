@@ -8,6 +8,7 @@ import com.example.pulseworkout.update.UpdateState
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.junit.Rule
+import org.junit.rules.RuleChain
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -20,8 +21,10 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
 class UpdateDialogTest {
-    @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
+
+    @get:Rule
+    val chain: RuleChain = RuleChain.outerRule(CleanStateRule()).around(rule)
 
     private val release = GithubRelease(
         tag = "v2.2.0",

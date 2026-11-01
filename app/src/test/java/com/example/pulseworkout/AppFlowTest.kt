@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTextInput
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.junit.Rule
+import org.junit.rules.RuleChain
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -25,8 +26,10 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
 class AppFlowTest {
-    @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
+
+    @get:Rule
+    val chain: RuleChain = RuleChain.outerRule(CleanStateRule()).around(rule)
 
     // Снимок всего экрана, включая шторки и диалоги (они живут в отдельных окнах).
     private fun shot(name: String) {

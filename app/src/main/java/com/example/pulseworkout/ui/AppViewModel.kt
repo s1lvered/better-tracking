@@ -36,7 +36,8 @@ import kotlin.math.roundToInt
 
 sealed interface Sheet {
     data object StartWorkout : Sheet
-    data object ExerciseChooser : Sheet
+    /** supersetWith — instanceId упражнения, к которому добавляется второе упражнение суперсета. */
+    data class ExerciseChooser(val supersetWith: String? = null) : Sheet
     data class SetEntry(val exerciseId: String, val instanceId: String) : Sheet
     data class CardioFinish(val cardioEntryId: String, val requestedAt: Long) : Sheet
     /** Кардио в уже прошедшей (редактируемой) тренировке вводится вручную, без живого таймера. */
@@ -402,7 +403,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         entries.filter { !it.isCardio && it.exerciseId != null }.forEach { entry ->
             val key = entry.instanceId ?: "exercise:${entry.exerciseId}"
             val instance = byKey.getOrPut(key) {
-                ExerciseInstance(uid("edit-exercise"), entry.exerciseId!!, completed = true).also { instances += it }
+                ExerciseInstance(uid("edit-exercise"), entry.exerciseId!!, completed = true, supersetId = entry.supersetId).also { instances += it }
             }
             entry.instanceId = instance.instanceId
         }
@@ -441,8 +442,88 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return ExerciseInstance(uid("exercise"), exerciseId).also { instances.add(0, it) }
     }
 
-    fun selectSessionExercise(exerciseId: String) {
+    // ---------- суперсеты ----------
+
+    /** Упражнения суперсета в порядке выполнения (A, B, C — в порядке добавления). */
+    fun supersetMembers(supersetId: String): List<ExerciseInstance> =
+        session?.exerciseInstances.orEmpty().filter { it.supersetId == supersetId }.reversed()
+
+    /** Буква упражнения в суперсете: A, B, C… */
+    fun supersetLetter(instance: ExerciseInstance): String {
+        val id = instance.supersetId ?: return ""
+        return ('A' + supersetMembers(id).indexOf(instance).coerceAtLeast(0)).toString()
+    }
+
+    /** Номер текущего круга и следующее упражнение (у которого меньше всего подходов). */
+    fun supersetProgress(supersetId: String): Pair<Int, ExerciseInstance?> {
+        val members = supersetMembers(supersetId)
+        val counts = members.map { instanceEntries(it).size }
+        val min = counts.minOrNull() ?: 0
+        val next = members.firstOrNull { instanceEntries(it).size == min }
+        return (min + 1) to next
+    }
+
+    fun startSuperset(instanceId: String) {
+        sheet = Sheet.ExerciseChooser(supersetWith = instanceId)
+    }
+
+    private fun addToSuperset(targetId: String, exerciseId: String) {
         val s = session ?: return
+        val target = s.exerciseInstances.firstOrNull { it.instanceId == targetId } ?: return
+        val groupId = target.supersetId ?: uid("superset").also { id ->
+            target.supersetId = id
+            instanceEntries(target).forEach { it.supersetId = id }
+        }
+        if (supersetMembers(groupId).any { it.exerciseId == exerciseId }) {
+            showToast("Это упражнение уже в суперсете")
+            return
+        }
+        // Повторно добавленное упражнение отделяется от прежнего экземпляра, чтобы не смешивать подходы.
+        val instance = ExerciseInstance(uid("exercise"), exerciseId, supersetId = groupId)
+        // Новое упражнение встаёт сразу над группой: группа остаётся одной карточкой.
+        val firstIndex = s.exerciseInstances.indexOfFirst { it.supersetId == groupId }.coerceAtLeast(0)
+        s.exerciseInstances.add(firstIndex, instance)
+        supersetMembers(groupId).forEach { it.completed = false }
+        sheet = null
+        changed()
+        val letters = supersetMembers(groupId).joinToString(" + ") { calc.exercise(it.exerciseId).name }
+        showToast("Суперсет: $letters")
+    }
+
+    /** Убрать упражнение из суперсета; если в группе осталось одно, суперсет распадается. */
+    fun leaveSuperset(instanceId: String) {
+        val s = session ?: return
+        val instance = s.exerciseInstances.firstOrNull { it.instanceId == instanceId } ?: return
+        val groupId = instance.supersetId ?: return
+        instance.supersetId = null
+        instanceEntries(instance).forEach { it.supersetId = null }
+        if (instanceEntries(instance).isEmpty()) s.exerciseInstances.remove(instance)
+        val rest = supersetMembers(groupId)
+        if (rest.size == 1) {
+            rest[0].supersetId = null
+            instanceEntries(rest[0]).forEach { it.supersetId = null }
+        }
+        changed()
+    }
+
+    fun finishSuperset(supersetId: String) {
+        val s = session ?: return
+        val members = supersetMembers(supersetId)
+        val names = members.joinToString(" и ") { "«${calc.exercise(it.exerciseId).name}»" }
+        ask("Завершить суперсет?", "$names будут завершены.", "Завершить") {
+            members.forEach { m -> if (instanceEntries(m).isEmpty()) s.exerciseInstances.remove(m) else m.completed = true }
+            changed()
+        }
+    }
+
+    fun reopenSuperset(supersetId: String) {
+        supersetMembers(supersetId).forEach { it.completed = false }
+        changed()
+    }
+
+    fun selectSessionExercise(exerciseId: String, supersetWith: String? = null) {
+        val s = session ?: return
+        if (supersetWith != null) { addToSuperset(supersetWith, exerciseId); return }
         val unfinished = s.exerciseInstances.filter { !it.completed && it.exerciseId != exerciseId }
         val activate = {
             unfinished.forEach { it.completed = true }
@@ -503,10 +584,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val supportsBodyweight = exercise.bodyweight?.supported == true
         val isWeighted = if (supportsBodyweight) weighted else true
         val avgHr = if (pendingSetHrSamples.isEmpty()) 0 else pendingSetHrSamples.average().roundToInt()
+        val instance = s.exerciseInstances.firstOrNull { it.instanceId == instanceId }
         s.entries += Entry(
             type = "strength",
             exerciseId = exerciseId,
             instanceId = instanceId,
+            supersetId = instance?.supersetId,
             set = setDefaults(exerciseId, instanceId).setIndex,
             weight = if (isWeighted) weight else 0.0,
             reps = max(1, reps),
@@ -518,6 +601,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         pendingSetHrSamples.clear()
         sheet = null
+        // Суперсет: после подхода сразу следующее упражнение круга, отдых — после последнего.
+        val groupId = instance?.supersetId
+        val members = groupId?.let { supersetMembers(it) }.orEmpty()
+        val next = members.getOrNull(members.indexOf(instance) + 1)
+        if (groupId != null && next != null && s.editingWorkoutId == null) {
+            changed()
+            openSetEntry(next.exerciseId, next.instanceId)
+            return
+        }
         // Отдых между подходами начинается сам — не нужно нажимать «Старт».
         if (s.editingWorkoutId == null) startRest()
         changed()
