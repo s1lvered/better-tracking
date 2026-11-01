@@ -1,0 +1,14 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.kotlin/
+
+# Ключ подписи и пароли — никогда не коммитить
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.apk
