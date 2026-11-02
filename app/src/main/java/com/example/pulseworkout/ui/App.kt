@@ -3,7 +3,9 @@ package com.example.pulseworkout.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -238,30 +240,54 @@ private fun BottomNav(vm: AppViewModel) {
     }
 }
 
-/** Кнопка тренировки: в покое — «начать», во время тренировки — пульсирующая с таймером. */
+/**
+ * FAB тренировки:
+ * - тренировки нет — гантель, запускает тренировку;
+ * - тренировка идёт, открыт другой экран — гантель с расходящимися кругами, возвращает к тренировке;
+ * - открыт экран тренировки — destructive-состояние со «Стоп», завершает тренировку.
+ */
 @Composable
 private fun WorkoutButton(vm: AppViewModel) {
-    val live = vm.session?.editingWorkoutId == null && vm.session != null
-    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(1f, if (live) 1.06f else 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "scale")
-    Box(
-        Modifier
-            .scale(pulse)
-            .size(56.dp)
-            .shadow(if (live) 18.dp else 0.dp, CircleShape, ambientColor = Ds.lime, spotColor = Ds.lime)
-            .clip(CircleShape)
-            .background(Ds.primaryBrush)
-            .clickable { vm.feedback.haptic(); vm.onWorkoutButton() },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (live) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(DsIcons.Dumbbell, null, tint = Ds.black, modifier = Modifier.size(18.dp))
-                Text(Calc.clock(vm.sessionElapsedSeconds()), style = DsType.Footnote.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"), color = Ds.black)
+    val state = vm.workoutFabState()
+    Box(contentAlignment = Alignment.Center) {
+        if (state == WorkoutFab.Return) FabRipples(Ds.lime)
+        Box(
+            Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(if (state == WorkoutFab.Stop) SolidColor(Ds.negative) else Ds.primaryBrush)
+                .clickable { vm.feedback.haptic(); vm.onWorkoutButton() },
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(state, transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) }, label = "fab") { s ->
+                when (s) {
+                    WorkoutFab.Stop -> Icon(DsIcons.StopFill, "Остановить тренировку", tint = Ds.white, modifier = Modifier.size(22.dp))
+                    WorkoutFab.Return -> Icon(DsIcons.Dumbbell, "Вернуться к тренировке", tint = Ds.black, modifier = Modifier.size(24.dp))
+                    WorkoutFab.Start -> Icon(DsIcons.Dumbbell, "Начать тренировку", tint = Ds.black, modifier = Modifier.size(24.dp))
+                }
             }
-        } else {
-            Icon(DsIcons.Dumbbell, "Начать тренировку", tint = Ds.black, modifier = Modifier.size(24.dp))
         }
     }
+}
+
+/** Концентрические круги, плавно расходящиеся из-под FAB (три волны со сдвигом фазы). */
+@Composable
+private fun FabRipples(color: Color) {
+    val progress by rememberInfiniteTransition(label = "ripples").animateFloat(
+        0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "progress",
+    )
+    Box(
+        Modifier.size(56.dp).drawBehind {
+            val base = size.minDimension / 2
+            repeat(3) { i ->
+                val t = (progress + i / 3f) % 1f
+                val radius = base * (1f + 0.75f * t)
+                val alpha = (1f - t) * 0.45f
+                drawCircle(color.copy(alpha = alpha * 0.35f), radius)
+                drawCircle(color.copy(alpha = alpha), radius, style = Stroke(1.5.dp.toPx()))
+            }
+        },
+    )
 }
 
 /** Tabbar Button: активная — радиальное лаймовое свечение, иконка и подпись Lime/Accent. */

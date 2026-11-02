@@ -379,9 +379,9 @@ fun SupersetLetter(letter: String) {
     ) { Text(letter, style = DsType.Label2B, color = Ds.lime) }
 }
 
-/** ListItem: точка цвета, название и подпись; справа шеврон или чекбокс. */
+/** ListItem: точка цвета (или иконка на подложке этого цвета), название и подпись; справа шеврон или чекбокс. */
 @Composable
-fun ChoiceRow(title: String, subtitle: String?, dot: Color?, selected: Boolean = false, showChevron: Boolean = true, checkable: Boolean = false, onClick: () -> Unit) {
+fun ChoiceRow(title: String, subtitle: String?, dot: Color?, selected: Boolean = false, showChevron: Boolean = true, checkable: Boolean = false, icon: ImageVector? = null, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -394,7 +394,10 @@ fun ChoiceRow(title: String, subtitle: String?, dot: Color?, selected: Boolean =
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (dot != null) {
+        if (icon != null) {
+            IconBadge(icon, dot ?: Ds.whiteTertiary, 36.dp)
+            Spacer(Modifier.width(12.dp))
+        } else if (dot != null) {
             GlowDot(dot)
             Spacer(Modifier.width(10.dp))
         }

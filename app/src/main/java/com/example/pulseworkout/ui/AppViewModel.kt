@@ -34,6 +34,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+/** Состояния FAB тренировки: начать, вернуться к идущей, остановить (на её экране). */
+enum class WorkoutFab { Start, Return, Stop }
+
 sealed interface Sheet {
     data object StartWorkout : Sheet
     /** supersetWith — instanceId упражнения, к которому добавляется второе упражнение суперсета. */
@@ -286,13 +289,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- старт / финиш тренировки ----------
 
-    /**
-     * Кнопка-гантель: во время тренировки ведёт к ней (в app.js она предлагала завершить
-     * текущую тренировку, и легко было случайно закончить её раньше времени).
-     */
-    fun onWorkoutButton() {
+    /** Состояние FAB: активна только идущая (не редактируемая) тренировка; «Стоп» — когда открыт её экран. */
+    fun workoutFabState(): WorkoutFab {
         val s = session
-        if (s != null && s.editingWorkoutId == null) tab = "log" else requestStartSession()
+        return when {
+            s == null || s.editingWorkoutId != null -> WorkoutFab.Start
+            tab == "log" -> WorkoutFab.Stop
+            else -> WorkoutFab.Return
+        }
+    }
+
+    /** FAB: запускает тренировку, возвращает к идущей или (на её экране) завершает её. */
+    fun onWorkoutButton() {
+        when (workoutFabState()) {
+            WorkoutFab.Start -> requestStartSession()
+            WorkoutFab.Return -> tab = "log"
+            WorkoutFab.Stop -> requestFinishSession()
+        }
     }
 
     fun requestStartSession() {

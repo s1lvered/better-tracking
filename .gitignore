@@ -6,6 +6,9 @@ local.properties
 captures/
 .kotlin/
 
+# Атлас экранов (~34 МБ) пересоздаёт ScreenAtlasTest; снимки лежат в Figma BETR, страница «10 Screenshots»
+app/screenshots/atlas/
+
 # Ключ подписи и пароли — никогда не коммитить
 keystore.properties
 *.jks

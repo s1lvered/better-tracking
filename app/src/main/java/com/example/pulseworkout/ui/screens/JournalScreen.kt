@@ -55,6 +55,9 @@ import com.example.pulseworkout.ui.theme.Bt
 import com.example.pulseworkout.ui.theme.BtType
 import com.example.pulseworkout.ui.theme.Ds
 import com.example.pulseworkout.ui.theme.DsIcons
+import com.example.pulseworkout.ui.theme.ExerciseIcons
+import com.example.pulseworkout.ui.components.IconBadge
+import com.example.pulseworkout.data.Catalog
 import com.example.pulseworkout.ui.theme.DsType
 import java.time.LocalDate
 
@@ -275,6 +278,11 @@ private fun WorkoutDetails(vm: AppViewModel, workout: Workout) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (letter != null) { SupersetLetter(letter); Spacer(Modifier.width(8.dp)) }
+                else {
+                    val category = vm.calc.categoryOf(exercise)
+                    IconBadge(ExerciseIcons.forCategory(category), Bt.color(Catalog.categoryColor(category)), 36.dp)
+                    Spacer(Modifier.width(10.dp))
+                }
                 Column {
                     Text(exercise.name, style = DsType.Title1B)
                     MetaRow(listOf(null to "${summary.sets} ${Calc.plural(summary.sets, "подход", "подхода", "подходов")}", null to Calc.tonnage(summary.tonnage)))
@@ -309,9 +317,13 @@ private fun WorkoutDetails(vm: AppViewModel, workout: Workout) {
         }
     }
     workout.entries.filter { it.isCardio }.forEach { entry ->
-        Column(Modifier.padding(top = 18.dp)) {
-            Text(entry.cardioName ?: "Кардио", style = DsType.Title1B)
-            MetaRow(listOf(DsIcons.Clock to "${Calc.num(entry.minutes)} мин", null to (if (entry.distance > 0) "${Calc.num(entry.distance)} км" else "—"), DsIcons.Flame to "${Math.round(vm.calc.entryCalories(entry))} ккал") + if (entry.avgHr > 0) listOf(DsIcons.Heart to "${entry.avgHr} уд/мин") else emptyList())
+        Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(ExerciseIcons.forCardio(entry.cardioId), Ds.negative, 36.dp)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(entry.cardioName ?: "Кардио", style = DsType.Title1B)
+                MetaRow(listOf(DsIcons.Clock to "${Calc.num(entry.minutes)} мин", null to (if (entry.distance > 0) "${Calc.num(entry.distance)} км" else "—"), DsIcons.Flame to "${Math.round(vm.calc.entryCalories(entry))} ккал") + if (entry.avgHr > 0) listOf(DsIcons.Heart to "${entry.avgHr} уд/мин") else emptyList())
+            }
         }
     }
 }

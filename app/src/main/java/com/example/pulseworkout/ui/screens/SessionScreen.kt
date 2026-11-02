@@ -71,6 +71,7 @@ import com.example.pulseworkout.ui.theme.Bt
 import com.example.pulseworkout.ui.theme.BtType
 import com.example.pulseworkout.ui.theme.Ds
 import com.example.pulseworkout.ui.theme.DsIcons
+import com.example.pulseworkout.ui.theme.ExerciseIcons
 import com.example.pulseworkout.ui.theme.DsType
 import kotlin.math.roundToInt
 
@@ -194,7 +195,7 @@ private fun CardioCard(vm: AppViewModel, entry: Entry, connected: Boolean, bpm: 
     if (entry.isRunningCardio) {
         Panel(brush = Bt.heroBrush, borderColor = Ds.lime) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(DsIcons.Heart, Ds.negative)
+                IconBadge(ExerciseIcons.forCardio(entry.cardioId), Ds.negative)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Кардио идёт", style = DsType.Label2R, color = Ds.lime)
@@ -214,7 +215,7 @@ private fun CardioCard(vm: AppViewModel, entry: Entry, connected: Boolean, bpm: 
         val duration = if (entry.durationSeconds > 0) entry.durationSeconds else (entry.minutes * 60).roundToInt().toLong()
         Panel {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(DsIcons.Heart, Ds.negative)
+                IconBadge(ExerciseIcons.forCardio(entry.cardioId), Ds.negative)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(entry.cardioName.orEmpty(), style = DsType.Title1B)
@@ -242,8 +243,8 @@ private fun ExerciseCard(vm: AppViewModel, instance: ExerciseInstance, entries: 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    GlowDot(Bt.color(Catalog.categoryColor(category)))
-                    Spacer(Modifier.width(6.dp))
+                    Icon(ExerciseIcons.forCategory(category), null, tint = Bt.color(Catalog.categoryColor(category)), modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(exercise.name, style = DsType.Title1B, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 MetaRow(
@@ -401,7 +402,7 @@ fun ExerciseChooserSheet(vm: AppViewModel, sheet: Sheet.ExerciseChooser) {
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
             if (tab == "cardio") {
                 vm.calc.visibleCardioOptions().forEach { activity ->
-                    ChoiceRow(activity.name, if (s.editingWorkoutId != null) "Ввести вручную" else "Запустить таймер", Ds.negative) { vm.startCardio(activity.id) }
+                    ChoiceRow(activity.name, if (s.editingWorkoutId != null) "Ввести вручную" else "Запустить таймер", Ds.negative, icon = ExerciseIcons.forCardio(activity.id)) { vm.startCardio(activity.id) }
                 }
             } else {
                 val list = if (tab.startsWith("category:")) strength.filter { vm.calc.categoryOf(it) == tab.removePrefix("category:") } else strength
@@ -409,7 +410,7 @@ fun ExerciseChooserSheet(vm: AppViewModel, sheet: Sheet.ExerciseChooser) {
                 list.forEach { exercise ->
                     val category = vm.calc.categoryOf(exercise)
                     val inSession = s.exerciseInstances.any { it.exerciseId == exercise.id }
-                    ChoiceRow(exercise.name, if (inSession) "$category · уже в тренировке" else category, Bt.color(Catalog.categoryColor(category))) {
+                    ChoiceRow(exercise.name, if (inSession) "$category · уже в тренировке" else category, Bt.color(Catalog.categoryColor(category)), icon = ExerciseIcons.forCategory(category)) {
                         vm.selectSessionExercise(exercise.id, sheet.supersetWith)
                     }
                 }

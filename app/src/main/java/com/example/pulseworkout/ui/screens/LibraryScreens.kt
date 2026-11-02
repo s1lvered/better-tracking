@@ -76,6 +76,8 @@ import com.example.pulseworkout.ui.theme.Bt
 import com.example.pulseworkout.ui.theme.BtType
 import com.example.pulseworkout.ui.theme.Ds
 import com.example.pulseworkout.ui.theme.DsIcons
+import com.example.pulseworkout.ui.theme.ExerciseIcons
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.pulseworkout.ui.theme.DsType
 import androidx.compose.foundation.layout.size
 
@@ -93,7 +95,7 @@ private fun TitleRow(vm: AppViewModel, title: String, subtitle: String, onAdd: (
 // ======================= Библиотека =======================
 
 /** Строка упражнения внутри групповой карточки. */
-private data class LibraryItem(val key: String, val name: String, val subtitle: String, val onEdit: (() -> Unit)?, val onDelete: () -> Unit)
+private data class LibraryItem(val key: String, val name: String, val subtitle: String, val onEdit: (() -> Unit)?, val icon: ImageVector? = null, val onDelete: () -> Unit)
 
 @Composable
 fun LibraryScreen(vm: AppViewModel) {
@@ -151,7 +153,7 @@ fun LibraryScreen(vm: AppViewModel) {
         }
         if (customCardio.isNotEmpty() || cardio.isNotEmpty()) item(key = "group-cardio") {
             GroupHeader("Кардио", customCardio.size + cardio.size)
-            LibraryGroup(vm, customCardio.map { itemFor(it, "Кардио") } + cardio.map { a -> LibraryItem("cardio-${a.id}", a.name, "Кардио · таймер", null) { vm.deleteCardio(a.id) } })
+            LibraryGroup(vm, customCardio.map { itemFor(it, "Кардио") } + cardio.map { a -> LibraryItem("cardio-${a.id}", a.name, "Кардио · таймер", null, ExerciseIcons.forCardio(a.id)) { vm.deleteCardio(a.id) } })
         }
         if (ordered.isEmpty() && customCardio.isEmpty() && cardio.isEmpty()) item {
             Spacer(Modifier.height(16.dp))
@@ -164,8 +166,8 @@ fun LibraryScreen(vm: AppViewModel) {
 @Composable
 private fun GroupHeader(category: String, count: Int) {
     Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        GlowDot(Bt.color(Catalog.categoryColor(category)), 7.dp)
-        Spacer(Modifier.width(6.dp))
+        IconBadge(ExerciseIcons.forCategory(category), Bt.color(Catalog.categoryColor(category)), 32.dp)
+        Spacer(Modifier.width(10.dp))
         Text(category, style = DsType.Title2B, modifier = Modifier.weight(1f))
         CountPill("$count")
     }
@@ -180,6 +182,10 @@ private fun LibraryGroup(vm: AppViewModel, items: List<LibraryItem>) {
                 Modifier.fillMaxWidth().then(if (item.onEdit != null) Modifier.clickable(onClick = item.onEdit) else Modifier).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (item.icon != null) {
+                    Icon(item.icon, null, tint = Ds.whiteSecondary, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(10.dp))
+                }
                 Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
                     Text(item.name, style = DsType.Body2R)
                     Text(item.subtitle, style = DsType.Label2R, color = Ds.whiteTertiary)
@@ -216,7 +222,7 @@ fun ExerciseEditSheet(vm: AppViewModel, exerciseId: String?) {
             FieldLabel("Категория")
             Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
                 currentGroup.categories.forEach { c ->
-                    ChoiceRow(c, null, Bt.color(Catalog.categoryColor(c)), selected = c == category, showChevron = false) { vm.feedback.haptic(); category = c }
+                    ChoiceRow(c, null, Bt.color(Catalog.categoryColor(c)), selected = c == category, showChevron = false, icon = ExerciseIcons.forCategory(c)) { vm.feedback.haptic(); category = c }
                 }
             }
         }
@@ -292,8 +298,8 @@ private fun SplitCard(vm: AppViewModel, id: String, title: String, subtitle: Str
                 vm.calc.sortCategories(visible.map { it.category }).forEach { category ->
                     val group = visible.filter { it.category == category }
                     Row(Modifier.padding(top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        GlowDot(Bt.color(Catalog.categoryColor(category)), 6.dp)
-                        Spacer(Modifier.width(4.dp))
+                        Icon(ExerciseIcons.forCategory(category), null, tint = Bt.color(Catalog.categoryColor(category)), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(category, style = DsType.Label2B, color = Ds.whiteSecondary, modifier = Modifier.weight(1f))
                         Text("${group.size}", style = DsType.Label2R, color = Ds.whiteTertiary)
                     }
@@ -363,8 +369,8 @@ fun SplitPickerSheet(vm: AppViewModel, splitId: String) {
                 val items = byCategory[category].orEmpty().filter { Calc.searchKey(query) in Calc.searchKey(it.name) }
                 if (items.isEmpty()) return@forEach
                 Row(Modifier.padding(top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GlowDot(Bt.color(Catalog.categoryColor(category)), 6.dp)
-                    Spacer(Modifier.width(4.dp))
+                    Icon(ExerciseIcons.forCategory(category), null, tint = Bt.color(Catalog.categoryColor(category)), modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(category, style = DsType.Label2B, color = Ds.whiteSecondary, modifier = Modifier.weight(1f))
                     Text("${items.size}", style = DsType.Label2R, color = Ds.whiteTertiary)
                 }

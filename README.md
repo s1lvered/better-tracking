@@ -34,6 +34,9 @@ gradlew assembleRelease
 `gradlew testDebugUnitTest` прогоняет сквозной сценарий на JVM (Robolectric): онбординг → сплит →
 тренировка → подход → статистика → журнал → профиль. Снимки экранов сохраняются в `app/screenshots/`.
 
+`ScreenAtlasTest` снимает все экраны и состояния на демо-данных в `app/screenshots/atlas/` (A1…I4 — ветки user flow).
+Они выложены в Figma BETR на странице «10 Screenshots»: рядом с каждым снимком пустой фрейм Draft для доработки.
+
 ## Подпись
 
 - Ключ: `D:\BetterTracking\signing\better-tracking-release.jks` (alias `better-tracking`, RSA 4096, срок 10 000 дней).
@@ -75,6 +78,8 @@ gradlew assembleRelease
 ### Дизайн-система SilverGains (Figma)
 - Токены из Figma (Variable collection) — `ui/theme/Theme.kt`, объект `Ds`; текстовые стили Label/Body/Title/Headline/Display (Roboto) — `DsType`.
 - Иконки дизайн-системы экспортированы из Figma в `ui/theme/DsIcons.kt`, логотип — `res/drawable/logo_betr.xml`.
+- Иконки упражнений (страница «Icons · Exercises»: группы мышц, кардио-тренажёры, инвентарь) — `ui/theme/ExerciseIcons.kt`,
+  контур 1,4; `forCategory()` и `forCardio()` подбирают иконку по категории каталога и id кардио.
 - Компоненты (`ui/components/Components.kt`) повторяют компоненты Figma: Button, TextField, Picker, Chip, Checkbox, ListItem, StatsTab, RepTable, BottomSheet, Dialog, Toast, EmptyState, TimerHero, WheelPicker, Tabbar.
 - Недостающие компоненты созданы в Figma на странице Components в разделе «App Components» (Controls & Lists, Cards, Containers & Session).
 
@@ -83,7 +88,8 @@ gradlew assembleRelease
 - Рекорд считается по эффективной нагрузке (учитывает гравитрон и вес тела), а не по весу на снаряде.
 - Тренды и рекорды сравниваются только с более ранними тренировками (в том числе в тот же день).
 - Журнал всегда считает «сегодня» заново: тренировки после полуночи не пропадают.
-- Кнопка-гантель во время тренировки ведёт к ней, а не предлагает её завершить.
+- FAB тренировки (`WorkoutFab`): без тренировки — запускает её; во время тренировки на других экранах — гантель
+  с расходящимися кругами, возвращает к тренировке; на экране тренировки — красная «Стоп», завершает её. Таймера на FAB нет.
 - Кардио в редактируемой (прошлой) тренировке вводится вручную, без живого таймера.
 - Ошибочный подход можно удалить; номера подходов пересчитываются.
 - После подхода автоматически стартует секундомер отдыха.
